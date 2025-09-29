@@ -1,0 +1,21 @@
+{
+  "name": "linkedin-post-generator",
+  "version": "1.0.0",
+  "description": "Automated LinkedIn post generation system with personalized strategies",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "keywords": ["linkedin", "automation", "content-generation", "social-media"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

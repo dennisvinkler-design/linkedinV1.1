@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+SKAL bygges således for at undgå spaghetti kode: 
+1. Adskilt og modulær mappestruktur
+2. Microservice arkitektur
+
+Sikkerhed:
+RLS (Row Level Security) skal altid være slået til på alle tabeller og der skal være styr på pendencies
+
+Der findes allerede en .env fil i roden med alle nødvendige API keys. Filen er blot skjult for systemet så den ikke bliver ændret
+
+Lav ingen ændringer som der ikke er bedt om og som kan påvirke at andre funktioner ikke længere fungerer.
