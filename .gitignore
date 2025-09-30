@@ -54,3 +54,8 @@ Thumbs.db
 # Uploads
 backend/uploads/
 uploads/
+
+# System and Editor folders
+.cursor/
+.rustup/
+AppData/

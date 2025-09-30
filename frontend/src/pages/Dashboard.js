@@ -18,6 +18,7 @@ const Dashboard = () => {
   const [persons, setPersons] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -26,12 +27,13 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Fetch stats and data
+      // Fetch stats and data with retry logic for initial load
       const [personsRes, companiesRes, postsRes] = await Promise.all([
-        apiClient.get('/persons'),
-        apiClient.get('/companies'),
-        apiClient.get('/posts')
+        apiClient.get('/persons', { allowEmptyCache: true }),
+        apiClient.get('/companies', { allowEmptyCache: true }),
+        apiClient.get('/posts', { allowEmptyCache: true })
       ]);
 
       setPersons(personsRes.data.data || []);
@@ -44,12 +46,24 @@ const Dashboard = () => {
       });
 
       // Fetch recent posts
-      const recentPostsRes = await apiClient.get('/posts?limit=5');
+      const recentPostsRes = await apiClient.get('/posts?limit=5', { allowEmptyCache: true });
       setRecentPosts(recentPostsRes.data.data?.slice(0, 5) || []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+      setError(error);
+      
+      // Check if it's a connection error (backend not ready)
+      if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        toast.error('Backend server is not ready. Please wait a moment and refresh the page.');
+        
+        // Retry after 3 seconds
+        setTimeout(() => {
+          fetchDashboardData();
+        }, 3000);
+      } else {
+        toast.error('Failed to load dashboard data: ' + (error.response?.data?.message || error.message));
+      }
     } finally {
       setLoading(false);
     }
@@ -118,8 +132,69 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-linkedin-500"></div>
+      <div className="space-y-6">
+        <div className="md:flex md:items-center md:justify-between">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+              {t('dashboardTitle')}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {t('dashboardSubtitle')}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-linkedin-500 mx-auto"></div>
+            <p className="mt-4 text-sm text-gray-500">Loading dashboard data...</p>
+            <p className="mt-1 text-xs text-gray-400">This may take a moment on first startup</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !loading) {
+    return (
+      <div className="space-y-6">
+        <div className="md:flex md:items-center md:justify-between">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+              {t('dashboardTitle')}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {t('dashboardSubtitle')}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="rounded-full bg-red-100 p-3 mx-auto w-16 h-16 flex items-center justify-center">
+              <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">Failed to load dashboard</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              {error.code === 'ECONNREFUSED' || error.message.includes('Network Error') 
+                ? 'Backend server is not ready. Please wait a moment and try again.'
+                : 'There was an error loading the dashboard data.'}
+            </p>
+            <div className="mt-6">
+              <button
+                onClick={fetchDashboardData}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-linkedin-600 hover:bg-linkedin-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-linkedin-500"
+              >
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -4,7 +4,7 @@ import cacheService, { CacheService } from '../services/cacheService';
 
 const ApiContext = createContext();
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -31,8 +31,8 @@ const enhancedApiClient = {
       cacheService.set(cacheKey, response.data);
       return response;
     } catch (error) {
-      // Return cached data if available on error
-      if (cached) {
+      // Only return cached data if it's not empty and not the initial load
+      if (cached && Object.keys(cached).length > 0 && !config.allowEmptyCache) {
         console.warn('API error, returning cached data:', error.message);
         return { data: cached };
       }

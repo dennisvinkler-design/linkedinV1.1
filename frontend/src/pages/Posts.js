@@ -22,7 +22,8 @@ const Posts = () => {
   });
   const [generateForm, setGenerateForm] = useState({
     entity_type: 'person',
-    entity_id: ''
+    entity_id: '',
+    requirements: ''
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -89,7 +90,7 @@ const Posts = () => {
       const response = await apiClient.post('/posts/generate', {
         entity_type: generateForm.entity_type,
         entity_id: generateForm.entity_id,
-        count: 3
+        requirements: generateForm.requirements
       });
 
       console.log('Generated posts response:', response.data);
@@ -108,6 +109,7 @@ const Posts = () => {
           entity_id: generateForm.entity_id,
           content: post.content?.substring(0, 100) + '...',
           hashtags: post.hashtags,
+          post_type: post.post_type,
           status: 'draft'
         });
         
@@ -116,6 +118,7 @@ const Posts = () => {
           entity_id: generateForm.entity_id,
           content: post.content,
           hashtags: post.hashtags,
+          post_type: post.post_type,
           status: 'draft'
         });
       }
@@ -124,7 +127,8 @@ const Posts = () => {
       setShowGenerateModal(false);
       setGenerateForm({
         entity_type: 'person',
-        entity_id: ''
+        entity_id: '',
+        requirements: ''
       });
       // Automatically refresh posts after generation
       await fetchPosts();
@@ -450,6 +454,19 @@ const Posts = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Post Requirements (Optional)
+                  </label>
+                  <textarea
+                    value={generateForm.requirements}
+                    onChange={(e) => setGenerateForm(prev => ({ ...prev, requirements: e.target.value }))}
+                    rows={3}
+                    className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-linkedin-500 focus:border-linkedin-500 sm:text-sm"
+                    placeholder="Beskriv specifikke krav eller ønsker til indlæggene (f.eks. tema, tone, målgruppe, specifikke punkter der skal dækkes)..."
+                  />
                 </div>
 
                 <div>

@@ -233,7 +233,7 @@ const Profiles = () => {
       const response = await apiClient.post('/posts/generate', {
         entity_type: entityType,
         entity_id: entityId,
-        count: 3
+        requirements: ''
       });
 
       for (const post of response.data.data) {
@@ -242,6 +242,7 @@ const Profiles = () => {
           entity_id: entityId,
           content: post.content,
           hashtags: post.hashtags,
+          post_type: post.post_type,
           status: 'draft'
         });
       }

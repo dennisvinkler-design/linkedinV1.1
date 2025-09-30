@@ -52,7 +52,7 @@ This system follows a microservice architecture with clear separation of concern
    npm run dev
    ```
 
-   This will start both backend (port 3001) and frontend (port 3000).
+   This will start both backend (port 3002) and frontend (port 3000).
 
 ## Usage
 

@@ -44,6 +44,7 @@ const createPostSchema = z.object({
   entity_id: z.string().uuid(),
   content: z.string().min(10),
   hashtags: z.array(z.string()).optional(),
+  post_type: z.enum(['educational', 'personal_story', 'industry_insight', 'contrarian_viewpoint', 'problem_agitate_solve', 'general']).default('general'),
   scheduled_date: z.string().datetime().optional(),
   status: z.enum(['draft', 'scheduled', 'posted', 'failed']).default('draft')
 });
@@ -53,7 +54,7 @@ const updatePostSchema = createPostSchema.partial();
 // POST /api/posts/generate - Generate posts for entity
 router.post('/generate', async (req, res) => {
   try {
-    const { entity_type, entity_id } = req.body;
+    const { entity_type, entity_id, requirements } = req.body;
     
     if (!entity_type || !entity_id) {
       return res.status(400).json({ 
@@ -95,8 +96,22 @@ router.post('/generate', async (req, res) => {
       });
     }
 
-    // Generate posts (always 3 different styles) without strategy
-    const generatedPosts = await postGenerator.generateMultiplePosts(entityData, null, 3);
+    // Delete existing posts for this entity to avoid duplicates
+    const { error: deleteError } = await supabase
+      .from('posts')
+      .delete()
+      .eq('entity_type', entity_type)
+      .eq('entity_id', entity_id)
+      .eq('status', 'draft');
+    
+    if (deleteError) {
+      logger.warn('Failed to delete existing draft posts:', deleteError);
+    } else {
+      logger.info(`Deleted existing draft posts for ${entity_type}: ${entity_id}`);
+    }
+
+    // Generate posts (3 different advanced styles) without strategy
+    const generatedPosts = await postGenerator.generateMultiplePosts(entityData, null, 3, requirements);
 
     logger.info(`Generated 3 posts for ${entity_type}: ${entity_id}`);
     res.json({ success: true, data: generatedPosts });

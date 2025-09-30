@@ -16,28 +16,28 @@ class PostGenerator {
         messages: [
           {
             role: "system",
-            content: `You are a LinkedIn content expert who creates high-quality, engaging posts that drive meaningful engagement. 
+            content: `Du agerer som en ghostwriter og kommunikationsstrateg i verdensklasse, specialiseret i at fange den autentiske stemme hos topledere og brands til LinkedIn. Din opgave er at skrive et indlæg, der er indsigtsfuldt, substantielt og lyder, som om det er skrevet af en menneskelig ekspert, der reflekterer over egne erfaringer. Overhold alle instruktioner strengt.
 
-CRITICAL INSTRUCTIONS:
-- Create SUBSTANTIAL content (minimum 200 words) - never create short, generic posts
-- Each post must be UNIQUE and DIFFERENT from others
-- Use authentic, personal voice - avoid corporate jargon and marketing speak
-- Include specific examples, stories, case studies, or detailed insights
-- Make posts feel like they come from someone with real expertise and experience
-- Focus on providing genuine value to the audience
-- Use storytelling elements and concrete details
-- Create posts that encourage meaningful engagement and discussion
-- Incorporate the user's personal preferences and communication style from the improvement data
+KRITISKE INSTRUKTIONER:
+- Opret SUBSTANTIELT indhold (minimum 200 ord) - aldrig korte, generiske indlæg
+- Hvert indlæg skal være UNIKT og FORSKELLIGT fra andre
+- Brug autentisk, personlig stemme - undgå corporate jargon og marketing-snak
+- Inkluder specifikke eksempler, historier, casestudier eller detaljerede indsigter
+- Gør indlæg til at føles som om de kommer fra en med reel ekspertise og erfaring
+- Fokusér på at levere ægte værdi til målgruppen
+- Brug storytelling-elementer og konkrete detaljer
+- Skab indlæg der opfordrer til meningsfuld engagement og diskussion
+- Inkorporér brugerens personlige præferencer og kommunikationsstil
 
-IMPORTANT: You MUST respond with ONLY a valid JSON object in this exact format:
+VIGTIGT: Du SKAL svare med KUN et gyldigt JSON-objekt i dette præcise format:
 {
-  "content": "Your post content here - use \\n for line breaks, \\" for quotes",
-  "hashtags": ["hashtag1", "hashtag2", "hashtag3"]
+  "content": "Dit indlægsindhold her - brug \\n til linjeskift, \\" til anførselstegn",
+  "hashtags": []
 }
 
-Do NOT include any text before or after the JSON. Do NOT use any special characters that could break JSON parsing.
+Inkluder IKKE tekst før eller efter JSON'en. Brug IKKE specialtegn der kan ødelægge JSON-parsing.
 
-Avoid: Short posts, generic content, repetitive themes, corporate speak, vague statements.`
+Undgå: Korte indlæg, generisk indhold, gentagne temaer, corporate jargon, vage udsagn.`
           },
           {
             role: "user",
@@ -60,8 +60,87 @@ Avoid: Short posts, generic content, repetitive themes, corporate speak, vague s
     }
   }
 
+  buildWorldviewContext(entity, entityType, targetLanguage) {
+    if (entityType === 'person') {
+      const bio = entity.bio || 'Ikke angivet';
+      const keyExpertise = entity.key_expertise ? entity.key_expertise.join(', ') : 'Ikke angivet';
+      const targetAudience = entity.target_audience || 'Ikke angivet';
+      const brandingNotes = entity.personal_branding_notes || 'Ikke angivet';
+      
+      return `### KONTEKSTUELT VERDENSSYN ###
+Du skal skrive fra ${entity.name}s perspektiv. Internaliser denne persona:
+- **Identitet:** ${entity.name}, ${entity.title || 'Professionel'}. ${bio}
+- **Kerneoverbevisning:** Baseret på denne persons rejse og ekspertise, formulér vedkommendes kerneoverbevisning om ${keyExpertise}. Hvordan ser denne person verden anderledes end andre? Hvad er den centrale tese, personen forsvarer?
+- **Målgruppefokus:** ${entity.name} taler til ${targetAudience}. Antag, at de er intelligente og har travlt. Undlad at overforklare basale koncepter.
+- **Stemme & Tone:** ${brandingNotes}`;
+    } else {
+      const missionStatement = entity.mission_statement || 'Ikke angivet';
+      const keyProducts = entity.key_products_services ? entity.key_products_services.join(', ') : 'Ikke angivet';
+      const targetAudience = entity.target_audience || 'Ikke angivet';
+      const cultureNotes = entity.company_culture_notes || 'Ikke angivet';
+      
+      return `### KONTEKSTUELT VERDENSSYN ###
+Du skal skrive fra ${entity.name}s perspektiv. Internaliser denne brand-persona:
+- **Identitet:** ${entity.name} - ${missionStatement}
+- **Kerneoverbevisning:** Baseret på virksomhedens mission og ekspertise inden for ${keyProducts}, formulér virksomhedens kerneoverbevisning. Hvad er den unikke vinkel eller filosofi, der adskiller denne virksomhed?
+- **Målgruppefokus:** ${entity.name} taler direkte til ${targetAudience}. Antag, at de er intelligente og har travlt.
+- **Stemme & Tone:** ${cultureNotes}`;
+    }
+  }
 
-  buildPostPrompt(entity, strategy, postType, postNumber = 1) {
+  buildPostTypeInstructions(postType, entity) {
+    const keyExpertise = entity.key_expertise ? entity.key_expertise.join(', ') : 'din branche';
+    const targetAudience = entity.target_audience || 'din målgruppe';
+    
+    switch (postType) {
+      case 'educational':
+        return `### OPGAVE & RAMMEVÆRK (Educational Post) ###
+Indtag rollen som en erfaren mentor. **Struktur:** Start med en udbredt, men subtilt fejlbehæftet overbevisning inden for ${keyExpertise}. Dette er dit hook. Introducer derefter 'Nøgleindsigten' som en omformulering af denne overbevisning. Brug en præcis analogi eller et mikro-casestudie (reelt eller hypotetisk) som 'Understøttende detaljer'. 'Actionable takeaway' skal være et enkelt, ikke-indlysende spørgsmål, som læseren kan stille sit team. Din CTA skal invitere til uenighed eller alternative perspektiver i kommentarerne.`;
+
+      case 'personal_story':
+        return `### OPGAVE & RAMMEVÆRK (Personal Story Post) ###
+Anvend 'Situation-Complication-Resolution'-rammen. 'Situation' er den professionelle kontekst. 'Complication' skal være en specifik, ikke-triviel forhindring, der udløste et øjebliks tvivl eller en kritisk beslutning. 'Resolution' skal fokusere mindre på sejren og mere på den interne læring. Historiens morale skal være et overførbart princip, der er direkte relevant for ${targetAudience}s egne udfordringer.`;
+
+      case 'industry_insight':
+        return `### OPGAVE & RAMMEVÆRK (Industry Insight Post) ###
+Identificer to tilsyneladende uafhængige trends (f.eks. en fra ${keyExpertise} og en fra makroøkonomi eller teknologi). Din kerneopgave er at syntetisere disse til en ny forudsigelse eller en overraskende årsagssammenhæng. Præsenter dit argument med strukturen: Observation 1 → Observation 2 → Den Uventede Syntese/Implikation. Brug formuleringer som 'Den konventionelle visdom overser...' eller 'Hvad få diskuterer, er skæringspunktet mellem...' for eksplicit at udfordre normer.`;
+
+      case 'contrarian_viewpoint':
+        return `### OPGAVE & RAMMEVÆRK (Contrarian Viewpoint Post) ###
+Identificer en populær best practice, et buzzword eller en 'hellig ko' inden for ${keyExpertise}. Indlæggets formål er respektfuldt, men bestemt at argumentere imod det. Struktur: Anerkend det populære synspunkt og hvorfor det er tiltalende. Introducer derefter dit modargument ved at bruge frasen 'Min erfaring viser dog, at...'. Underbyg dit synspunkt med et logisk argument eller en kort anekdote. Afslut ikke med en løsning, men med et udfordrende spørgsmål til publikum. Tonen skal være selvsikker og provokerende, men ikke arrogant.`;
+
+      case 'problem_agitate_solve':
+        return `### OPGAVE & RAMMEVÆRK (Problem-Agitate-Solve Post) ###
+Identificer et almindeligt, frustrerende problem, som ${targetAudience} står over for. **Problem:** Beskriv dette problem ved hjælp af målgruppens eget sprog og følelser. Få dem til at føle sig forstået. **Agitate:** Uddyb problemet. Udforsk de skjulte omkostninger, frustrationer eller konsekvenser af at lade det være uløst. **Solve:** Introducer kerneprincippet eller den mentale model fra din ${keyExpertise} som vejen til løsningen. Sælg ikke et produkt; sælg indsigt. CTA'en skal bede læserne om at dele, hvordan de har håndteret netop dette problem.`;
+
+      default:
+        return `### OPGAVE & RAMMEVÆRK (General Post) ###
+Skab engagerende indhold der leverer værdi til din målgruppe. Inkluder specifikke eksempler, historier eller handlingsorienterede indsigter. Brug en samtaleagtig men professionel tone. Struktur: Hook → Hovedpunkt → Understøttende detaljer → Call to action.`;
+    }
+  }
+
+  buildNegativeConstraints() {
+    return `FORBUDTE ORD: synergi, leverage, deep dive, game-changing, frigør, boost, løftestang, disrupt, facilitate, mission-critical, robust, seamless, utilize, performant, innovative, out of the box, best practices, battle tested, cognitive load, commence, delve, individual, initial, numerous, pretty/quite/rather/really/very, referred to as, remainder, sufficient, thing.
+
+FORBUDTE FRASER: "I den digitale tidsalder...", "Det er ingen hemmelighed, at...", "I nutidens hurtigt skiftende verden...", "Lad os tage et dybt kig på...", "Hvad hvis jeg fortalte dig...", "De fleste mennesker tror...", "Som vi alle ved...", "Det er vigtigt at forstå...", "I dag vil jeg dele...", "Jeg tror, at...", "Vi ved alle...", "Det er klart, at...".
+
+UNDGÅ: Corporate jargon, overdreven entusiasme, hule retoriske spørgsmål, klichéfyldte åbningslinjer, passive stemmer, unødvendige adjektiver, floskler.`;
+  }
+
+  buildQualityControl() {
+    return `### AFSLUTTENDE KVALITETSTJEK ###
+Før du leverer det endelige output, skal du gennemgå dit genererede udkast i henhold til disse kriterier. Hvis det fejler på et af punkterne, skal du omskrive det, indtil det består.
+
+1. **Stemmegenkendelighed:** Lyder dette indlæg som den persona, der er beskrevet i 'Verdenssyn'? Eller lyder det som en generisk AI?
+2. **Substans over Fluff:** Tilføjer hver sætning værdi? Har jeg fjernet al corporate jargon, klichéer og fyldord?
+3. **Overholdelse af Begrænsninger:** Har jeg overholdt ALLE begrænsninger? Minimum 200 ord? NUL emojis? NUL hashtags?
+4. **Hook-Effektivitet:** Er den første sætning fængende nok til at stoppe en bruger i at scrolle? Skaber den nysgerrighed eller fremsætter den en dristig påstand?
+5. **CTA-Engagement:** Er call-to-action et åbent spørgsmål, der inviterer til ægte diskussion, ikke et generisk 'Hvad tænker du?'?
+
+Først efter at have bekræftet, at udkastet består alle fem tjek, skal du præsentere det endelige, polerede LinkedIn-indlæg.`;
+  }
+
+  buildPostPrompt(entity, strategy, postType, postNumber = 1, requirements = '') {
     const entityType = strategy ? strategy.entity_type : (entity.entity_type || 'person');
     const entityName = entity.name;
     const language = entity.language || 'da';
@@ -76,119 +155,59 @@ Avoid: Short posts, generic content, repetitive themes, corporate speak, vague s
     
     const targetLanguage = languageMap[language] || 'Danish (Dansk)';
     
-    let contextInfo = '';
-    if (entityType === 'person') {
-      contextInfo = `
-Person Details:
-- Name: ${entity.name}
-- Title: ${entity.title || 'Not specified'}
-- Company: ${entity.company || 'Not specified'}
-- Industry: ${entity.industry || 'Not specified'}
-- Bio: ${entity.bio || 'Not provided'}
-- Target Audience: ${entity.target_audience || 'Not specified'}
-- Key Expertise: ${entity.key_expertise ? entity.key_expertise.join(', ') : 'Not specified'}
-- Personal Branding Notes: ${entity.personal_branding_notes || 'Not provided'}
-- Language: ${targetLanguage}
-`;
-    } else {
-      contextInfo = `
-Company Details:
-- Name: ${entity.name}
-- Industry: ${entity.industry || 'Not specified'}
-- Company Size: ${entity.company_size || 'Not specified'}
-- Mission Statement: ${entity.mission_statement || 'Not provided'}
-- Target Audience: ${entity.target_audience || 'Not specified'}
-- Key Products/Services: ${entity.key_products_services ? entity.key_products_services.join(', ') : 'Not specified'}
-- Company Culture Notes: ${entity.company_culture_notes || 'Not provided'}
-- Language: ${targetLanguage}
-`;
-    }
+    // Build the advanced worldview context
+    const worldviewContext = this.buildWorldviewContext(entity, entityType, targetLanguage);
 
-    // Define specific instructions for each post type
-    let postTypeInstructions = '';
-    switch (postType) {
-      case 'educational':
-        postTypeInstructions = `
-EDUCATIONAL POST REQUIREMENTS:
-- Share valuable knowledge, tips, or insights from your expertise
-- Include specific examples, case studies, or actionable advice
-- Use a teaching tone that helps your audience learn something new
-- Structure: Hook → Key insight → Supporting details → Actionable takeaway → Call to action
-- Length: 200-400 words with substantial content
-- Focus on "How to" or "Why" questions that your audience has
-`;
-        break;
-      case 'personal_story':
-        postTypeInstructions = `
-PERSONAL STORY POST REQUIREMENTS:
-- Tell a compelling personal story or experience that relates to your industry
-- Include specific details, challenges faced, and lessons learned
-- Use storytelling elements: setting, conflict, resolution, and moral/lesson
-- Make it relatable and authentic - show vulnerability and growth
-- Structure: Story setup → Challenge/conflict → What happened → Key lesson → Call to action
-- Length: 250-450 words with rich narrative details
-- Connect the personal experience to broader industry insights
-`;
-        break;
-      case 'industry_insight':
-        postTypeInstructions = `
-INDUSTRY INSIGHT POST REQUIREMENTS:
-- Share observations about industry trends, changes, or future predictions
-- Include data, statistics, or specific examples from your experience
-- Provide your unique perspective on what this means for professionals
-- Challenge conventional thinking or highlight overlooked opportunities
-- Structure: Attention-grabbing statement → Supporting evidence → Analysis → Implications → Call to action
-- Length: 200-400 words with concrete insights
-- Position yourself as a thought leader with forward-thinking views
-`;
-        break;
-      default:
-        postTypeInstructions = `
-GENERAL POST REQUIREMENTS:
-- Create engaging content that provides value to your audience
-- Include specific examples, stories, or actionable insights
-- Use a conversational yet professional tone
-- Structure: Hook → Main point → Supporting details → Call to action
-- Length: 200-400 words with substantial content
-`;
-    }
+    // Define specific instructions for each post type with advanced frameworks
+    const postTypeInstructions = this.buildPostTypeInstructions(postType, entity);
 
+
+    // Build negative constraints
+    const negativeConstraints = this.buildNegativeConstraints();
+    
+    // Build quality control section
+    const qualityControl = this.buildQualityControl();
+
+    // Add user requirements if provided
+    const userRequirements = requirements ? `
+### BRUGERENS SPECIFIKKE KRAV ###
+Brugeren har angivet følgende krav til indlægget:
+"${requirements}"
+
+Dette skal prioriteres højest og integreres naturligt i indlægget. Sørg for at indholdet opfylder disse specifikke ønsker, samtidig med at det bevarer autenticiteten og kvaliteten i indlægget.
+` : '';
 
     return `
-Create a LinkedIn post for ${entityType === 'person' ? 'this person' : 'this company'}:
-
-${contextInfo}
-
-LinkedIn Content Guidelines:
-- Focus on providing value and insights relevant to your industry
-- Use a professional yet approachable tone
-- Share personal experiences and lessons learned
-- Engage your audience with thought-provoking content
-
-Post Type: ${postType}
-Post Number: ${postNumber} of 3 (this is post ${postNumber} in a series of 3 different posts)
+${worldviewContext}
 
 ${postTypeInstructions}
 
-CRITICAL REQUIREMENTS:
-- Write the entire post content in ${targetLanguage}
-- Create SUBSTANTIAL content (minimum 200 words) - avoid short, generic posts
-- Make each post UNIQUE and DIFFERENT from others
-- Include specific examples, stories, or detailed insights
-- Use authentic, personal voice - avoid corporate jargon
-- Include 3-5 relevant hashtags in ${targetLanguage}
-- Use emojis sparingly and appropriately to enhance the message
-- End with a compelling call to action that encourages engagement
-- Make it feel like it comes from someone with real expertise and experience
+${userRequirements}
 
-IMPORTANT: Format the response as valid JSON only. Do not include any text before or after the JSON. Escape all quotes and newlines properly.
+### NEGATIVE BEGRÆNSNINGER ###
+${negativeConstraints}
+
+### KRITISKE KRAV ###
+- Skriv hele indlægget på ${targetLanguage}
+- Opret SUBSTANTIELT indhold (minimum 200 ord) - undgå korte, generiske indlæg
+- Gør hvert indlæg UNIKT og FORSKELLIGT fra andre
+- Inkluder specifikke eksempler, historier eller detaljerede indsigter
+- Brug autentisk, personlig stemme - undgå corporate jargon
+- INGEN emojis - fokusér på substans over visuelle effekter
+- INGEN hashtags - indholdet skal være så værdifuldt at det kan stå alene
+- Afslut med en overbevisende call-to-action der opfordrer til ægte engagement
+- Gør det til at føles som om det kommer fra en med reel ekspertise og erfaring
+
+${qualityControl}
+
+VIGTIGT: Formatér svaret som gyldigt JSON kun. Inkluder ikke tekst før eller efter JSON'en. Escape alle anførselstegn og linjeskift korrekt.
 
 {
-  "content": "The main post content in ${targetLanguage} (escape quotes with \\\" and newlines with \\n)",
-  "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"]
+  "content": "Indlægets hovedindhold på ${targetLanguage} (escape anførselstegn med \\\" og linjeskift med \\n)",
+  "hashtags": []
 }
 
-Remember: Create content that provides real value and feels authentic. Avoid generic, short posts. Make it detailed and engaging like a thought leader would write. Return ONLY the JSON object, no additional text.
+Husk: Skab indhold der leverer ægte værdi og føles autentisk. Undgå generiske, korte indlæg. Gør det detaljeret og engagerende som en thought leader ville skrive. Returnér KUN JSON-objektet, ingen yderligere tekst.
 `;
   }
 
@@ -287,14 +306,14 @@ Remember: Create content that provides real value and feels authentic. Avoid gen
     }
   }
 
-  async generateMultiplePosts(entity, strategy, count = 3) {
+  async generateMultiplePosts(entity, strategy, count = 3, requirements = '') {
     try {
-      // Always generate exactly 3 posts with different styles
+      // Generate 3 posts with different advanced styles including new post types
       const postTypes = ['educational', 'personal_story', 'industry_insight'];
       
       // Generate all posts in parallel for much faster execution
       const postPromises = postTypes.map(async (postType, index) => {
-        const post = await this.generatePost(entity, strategy, postType, index + 1);
+        const post = await this.generatePost(entity, strategy, postType, index + 1, requirements);
         return {
           ...post,
           post_type: postType,
@@ -304,6 +323,8 @@ Remember: Create content that provides real value and feels authentic. Avoid gen
       
       // Wait for all posts to be generated
       const posts = await Promise.all(postPromises);
+      
+      logger.info(`Successfully generated ${posts.length} posts with types: ${posts.map(p => p.post_type).join(', ')}`);
       
       return posts;
     } catch (error) {

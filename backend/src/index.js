@@ -13,7 +13,7 @@ const companyRoutes = require('./routes/companies');
 const postRoutes = require('./routes/posts');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 // Set timeout for long-running requests (like post generation)
 app.use((req, res, next) => {

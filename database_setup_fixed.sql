@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS posts (
   entity_id UUID NOT NULL,
   content TEXT NOT NULL,
   hashtags TEXT[],
+  post_type VARCHAR(50) DEFAULT 'general' CHECK (post_type IN ('educational', 'personal_story', 'industry_insight', 'contrarian_viewpoint', 'problem_agitate_solve', 'general')),
   scheduled_date TIMESTAMP WITH TIME ZONE,
   posted_date TIMESTAMP WITH TIME ZONE,
   status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'posted', 'failed')),
