@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../context/ApiContext';
-import { Plus, RefreshCw, Calendar, Hash, User, Building2, Sparkles, Edit, X, Loader2 } from 'lucide-react';
+import { Plus, RefreshCw, Calendar, Hash, User, Building2, Sparkles, Edit, X, Loader2, MessageSquarePlus } from 'lucide-react';
 import LinkedInPostPreview from '../components/LinkedInPostPreview';
 import toast from 'react-hot-toast';
 
@@ -36,6 +36,12 @@ const Posts = () => {
     scheduled_time: '09:00'
   });
 
+  // Improve/chat state
+  const [openImproveFor, setOpenImproveFor] = useState(null); // post id
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [feedbackThreads, setFeedbackThreads] = useState({}); // postId -> messages
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -70,6 +76,56 @@ const Posts = () => {
       toast.error('Failed to load posts');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeedback = async (postId) => {
+    try {
+      const res = await apiClient.get(`/posts/${postId}/feedback`);
+      setFeedbackThreads(prev => ({ ...prev, [postId]: res.data.data || [] }));
+    } catch (e) {
+      console.error('Failed to load feedback', e);
+    }
+  };
+
+  const toggleImprove = async (post) => {
+    const next = openImproveFor === post.id ? null : post.id;
+    setOpenImproveFor(next);
+    if (next) await fetchFeedback(post.id);
+  };
+
+  const sendFeedback = async (post) => {
+    if (!chatInput.trim()) return;
+    try {
+      setChatLoading(true);
+      console.log('Sending feedback for post:', post.id, 'Feedback:', chatInput.trim());
+      
+      const res = await apiClient.post(`/posts/${post.id}/improve`, { feedback: chatInput.trim() });
+      console.log('Feedback response:', res.data);
+      
+      // Update the post in local state immediately
+      const updatedPost = res.data.data.improved_post;
+      console.log('Updated post:', updatedPost);
+      
+      setPosts(prev => {
+        const newPosts = prev.map(p => p.id === post.id ? { ...updatedPost, _lastUpdated: Date.now() } : p);
+        console.log('Updated posts state:', newPosts);
+        return newPosts;
+      });
+      
+      // append local thread
+      setFeedbackThreads(prev => ({
+        ...prev,
+        [post.id]: [ ...(prev[post.id] || []), res.data.data.feedback ]
+      }));
+      setChatInput('');
+      toast.success('Indlæg opdateret med forbedret version baseret på din feedback');
+    } catch (e) {
+      console.error('Improve failed', e);
+      const errorMessage = e.response?.data?.error || e.message;
+      toast.error(`Forbedring fejlede: ${errorMessage}`);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -170,7 +226,8 @@ const Posts = () => {
     try {
       await apiClient.delete(`/posts/${post.id}`);
       toast.success('Post deleted successfully!');
-      fetchPosts();
+      // Update UI immediately by removing the post from state
+      setPosts(prevPosts => prevPosts.filter(p => p.id !== post.id));
     } catch (error) {
       console.error('Error deleting post:', error);
       toast.error('Failed to delete post');
@@ -846,7 +903,8 @@ const Posts = () => {
             </li>
           ) : (
             filteredPosts.map((post) => (
-              <li key={post.id}>
+              <React.Fragment key={`${post.id}-${post.updated_at || post.created_at}`}>
+              <li>
                 <div className="px-4 py-4 sm:px-6">
                   <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* LinkedIn Preview - Left Column */}
@@ -870,6 +928,12 @@ const Posts = () => {
                         
                         <div className="text-sm text-gray-900 mb-3 whitespace-pre-line leading-relaxed">
                           {post.content}
+                          {chatLoading && openImproveFor === post.id && (
+                            <div className="mt-2 text-xs text-blue-600 flex items-center">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Opdaterer indlæg...
+                            </div>
+                          )}
                         </div>
                         
                         {post.hashtags && post.hashtags.length > 0 && (
@@ -938,6 +1002,15 @@ const Posts = () => {
                         </div>
                         
                         <div className="ml-4 flex flex-col space-y-2">
+                          {/* Improve at the top */}
+                          <button
+                            onClick={() => toggleImprove(post)}
+                            className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                          >
+                            <MessageSquarePlus className="h-4 w-4 mr-1" />
+                            {openImproveFor === post.id ? 'Hide Improve' : 'Improve'}
+                          </button>
+
                           {post.status === 'draft' && (
                             <>
                               <button
@@ -985,10 +1058,52 @@ const Posts = () => {
                           </button>
                         </div>
                       </div>
+                      {/* Inline Improve chat on the right side */}
+                      {openImproveFor === post.id && (
+                        <div className="mt-4 border rounded-lg p-4 bg-gray-50 relative">
+                          {chatLoading && (
+                            <div className="absolute inset-0 bg-white bg-opacity-90 rounded-lg flex items-center justify-center z-10">
+                              <div className="text-center">
+                                <Loader2 className="h-6 w-6 animate-spin text-linkedin-600 mx-auto mb-2" />
+                                <p className="text-sm text-gray-600">Genererer forbedret indlæg...</p>
+                              </div>
+                            </div>
+                          )}
+                          <h4 className="font-medium text-gray-900 mb-3">Feedback chat</h4>
+                          <div className="max-h-60 overflow-y-auto space-y-3 mb-3 pr-1">
+                            {(feedbackThreads[post.id] || []).map((msg) => (
+                              <div key={msg.id} className="bg-white border rounded p-2 text-sm">
+                                <div className="text-gray-700 whitespace-pre-wrap">{msg.feedback}</div>
+                                <div className="text-xs text-gray-400 mt-1">{new Date(msg.created_at).toLocaleString('da-DK')}</div>
+                              </div>
+                            ))}
+                            {feedbackThreads[post.id]?.length === 0 && (
+                              <div className="text-sm text-gray-500">Ingen feedback endnu. Skriv din første besked nedenfor.</div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              value={chatInput}
+                              onChange={(e) => setChatInput(e.target.value)}
+                              placeholder="Skriv specifik feedback til at forbedre indlægget..."
+                              className="flex-1 border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-linkedin-500"
+                            />
+                            <button
+                              onClick={() => sendFeedback(post)}
+                              disabled={chatLoading || !chatInput.trim()}
+                              className={`inline-flex items-center px-3 py-2 rounded-md text-white ${chatLoading || !chatInput.trim() ? 'bg-linkedin-400 cursor-not-allowed' : 'bg-linkedin-600 hover:bg-linkedin-700'}`}
+                            >
+                              {chatLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                              {chatLoading ? 'Genererer nyt indlæg...' : 'Send & Generate'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </li>
+              </React.Fragment>
             ))
           )}
         </ul>

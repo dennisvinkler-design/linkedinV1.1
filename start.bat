@@ -114,7 +114,7 @@ if not errorlevel 1 (
 
 echo Starting frontend...
 cd frontend
-start "LinkedIn Frontend" cmd /k "echo Frontend starting... && set PORT=3000 && npm start"
+start "LinkedIn Frontend" cmd /k "echo Frontend starting... && set PORT=3000 && set BROWSER=none && npm start"
 cd ..
 echo Frontend started in new window
 echo.
@@ -177,10 +177,7 @@ if errorlevel 1 (
 )
 :found_port
 
-REM Open browser automatically
-start http://localhost:%FRONTEND_PORT%
-
-echo Browser opened automatically!
+echo System is ready! Navigate to http://localhost:%FRONTEND_PORT% in your browser.
 echo.
 echo Check the backend and frontend windows for any errors.
 echo Close this window when you're done.

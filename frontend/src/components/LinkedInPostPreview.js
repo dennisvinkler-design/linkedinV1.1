@@ -13,6 +13,33 @@ const LinkedInPostPreview = ({ post, userProfile = null }) => {
 
   const profile = userProfile || defaultProfile;
 
+  // Get the backend base URL for images
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
+  const BACKEND_BASE_URL = API_BASE_URL.replace('/api', '');
+  
+  // Construct full image URL
+  const getImageUrl = (imageUrl) => {
+    if (!imageUrl) {
+      console.log('🖼️ No image URL provided');
+      return null;
+    }
+    if (imageUrl.startsWith('http')) {
+      console.log('🖼️ Using absolute URL:', imageUrl);
+      return imageUrl;
+    }
+    if (imageUrl.startsWith('data:')) {
+      console.log('🖼️ Using base64 image');
+      return imageUrl;
+    }
+    const fullUrl = `${BACKEND_BASE_URL}${imageUrl}`;
+    console.log('🖼️ Constructed image URL:', { 
+      original: imageUrl, 
+      backend: BACKEND_BASE_URL, 
+      full: fullUrl 
+    });
+    return fullUrl;
+  };
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm max-w-2xl mx-auto">
       {/* Header */}
@@ -71,9 +98,13 @@ const LinkedInPostPreview = ({ post, userProfile = null }) => {
       {post?.image_url && (
         <div className="px-4 pb-3">
           <img
-            src={post.image_url}
+            src={getImageUrl(post.image_url)}
             alt="Post content"
             className="w-full h-auto rounded-lg object-cover"
+            onError={(e) => {
+              console.error('Failed to load image:', post.image_url);
+              e.target.style.display = 'none';
+            }}
           />
         </div>
       )}

@@ -18,6 +18,35 @@ CREATE TABLE IF NOT EXISTS persons (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Feedback memory for self-improving post generation
+CREATE TABLE IF NOT EXISTS post_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('person','company')),
+  entity_id UUID NOT NULL,
+  feedback TEXT NOT NULL,
+  generated_version TEXT, -- snapshot of improved content
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for fast retrieval
+CREATE INDEX IF NOT EXISTS idx_post_feedback_post_id ON post_feedback(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_feedback_entity ON post_feedback(entity_type, entity_id);
+
+-- Enable RLS on post_feedback
+ALTER TABLE post_feedback ENABLE ROW LEVEL SECURITY;
+
+-- Basic permissive policy: backend service role inserts/selects; users authenticated by same project can read/write their org's rows.
+-- Adjust to your auth model as needed.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'post_feedback' AND policyname = 'allow_all_service_role'
+  ) THEN
+    CREATE POLICY allow_all_service_role ON post_feedback FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
 -- Enable RLS on persons
 ALTER TABLE persons ENABLE ROW LEVEL SECURITY;
 
@@ -78,6 +107,10 @@ CREATE TABLE IF NOT EXISTS posts (
   posted_date TIMESTAMP WITH TIME ZONE,
   status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'posted', 'failed')),
   engagement_metrics JSONB,
+  image_url VARCHAR(500),
+  image_filename VARCHAR(255),
+  image_size INTEGER,
+  image_mime_type VARCHAR(100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

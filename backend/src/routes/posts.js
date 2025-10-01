@@ -121,6 +121,112 @@ router.post('/generate', async (req, res) => {
   }
 });
 
+// GET /api/posts/:id/feedback - list feedback for a post
+router.get('/:id/feedback', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: post, error: postErr } = await supabase
+      .from('posts')
+      .select('id, entity_type, entity_id')
+      .eq('id', id)
+      .single();
+    if (postErr || !post) return res.status(404).json({ success: false, error: 'Post not found' });
+
+    const { data, error } = await supabase
+      .from('post_feedback')
+      .select('*')
+      .eq('post_id', id)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (e) {
+    logger.error('Error fetching feedback:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/posts/:id/improve - save feedback and generate a single improved draft
+router.post('/:id/improve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { feedback } = req.body;
+    
+    logger.info(`Improving post ${id} with feedback: ${feedback?.substring(0, 100)}...`);
+    
+    if (!feedback || feedback.trim().length < 3) {
+      return res.status(400).json({ success: false, error: 'Feedback is required' });
+    }
+
+    // Load post and entity
+    const { data: post, error: postErr } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (postErr || !post) return res.status(404).json({ success: false, error: 'Post not found' });
+
+    logger.info(`Loaded post ${id}: ${post.content?.substring(0, 100)}...`);
+
+    let entityData;
+    if (post.entity_type === 'person') {
+      const { data, error } = await supabase.from('persons').select('*').eq('id', post.entity_id).single();
+      if (error) throw error; entityData = data;
+    } else {
+      const { data, error } = await supabase.from('companies').select('*').eq('id', post.entity_id).single();
+      if (error) throw error; entityData = data;
+    }
+
+    logger.info(`Loaded entity data for ${post.entity_type}: ${entityData?.name}`);
+
+    // Build adaptive context
+    const adaptiveContext = await postGenerator.buildAdaptiveContext(post.entity_type, post.entity_id);
+
+    logger.info('Generating improved post...');
+
+    // Generate improved version using feedback as requirements
+    const improved = await postGenerator.generatePost(
+      entityData,
+      null,
+      post.post_type || 'general',
+      1,
+      `Forbedr følgende eksisterende udkast baseret på brugerens feedback.\n\nEKSISTERENDE UDKAST:\n${post.content}\n\nFEEDBACK:\n${feedback}`,
+      adaptiveContext
+    );
+
+    logger.info(`Generated improved content: ${improved.content?.substring(0, 100)}...`);
+
+    // Save feedback memory
+    const { data: fb, error: fbErr } = await supabase
+      .from('post_feedback')
+      .insert([{ post_id: id, entity_type: post.entity_type, entity_id: post.entity_id, feedback, generated_version: improved.content }])
+      .select()
+      .single();
+    if (fbErr) throw fbErr;
+
+    logger.info(`Saved feedback with ID: ${fb.id}`);
+
+    // Update the existing post with improved content
+    const { data: updatedPost, error: updateErr } = await supabase
+      .from('posts')
+      .update({ 
+        content: improved.content, 
+        hashtags: improved.hashtags,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (updateErr) throw updateErr;
+
+    logger.info(`Updated post ${id} with new content: ${updatedPost.content?.substring(0, 100)}...`);
+
+    res.json({ success: true, data: { improved_post: updatedPost, feedback: fb } });
+  } catch (e) {
+    logger.error('Error improving post:', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // POST /api/posts - Create post
 router.post('/', async (req, res) => {
   try {

@@ -7,20 +7,33 @@ const openai = new OpenAI({
 });
 
 class PostGenerator {
-  async generatePost(entity, strategy = null, postType = 'general', postNumber = 1) {
+  async generatePost(entity, strategy = null, postType = 'general', postNumber = 1, requirements = '', adaptiveContext = '') {
     try {
-      const prompt = this.buildPostPrompt(entity, strategy, postType, postNumber);
+      const prompt = this.buildPostPrompt(entity, strategy, postType, postNumber, requirements, adaptiveContext);
+      
+      // Detect if this is improving based on feedback
+      const isImprovingExisting = requirements.includes('EKSISTERENDE UDKAST');
       
       const completion = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
             role: "system",
-            content: `Du agerer som en ghostwriter og kommunikationsstrateg i verdensklasse, specialiseret i at fange den autentiske stemme hos topledere og brands til LinkedIn. Din opgave er at skrive et indlæg, der er indsigtsfuldt, substantielt og lyder, som om det er skrevet af en menneskelig ekspert, der reflekterer over egne erfaringer. Overhold alle instruktioner strengt.
+            content: `Du agerer som en ghostwriter og kommunikationsstrateg i verdensklasse, specialiseret i at fange den autentiske stemme hos topledere og brands til LinkedIn. Din opgave er at skrive et indlæg, der er indsigtsfuldt, substantielt og lyder, som om det er skrevet af en menneskelig ekspert, der reflekterer over egne erfaringer.
 
+${isImprovingExisting ? `
+🔴 DU FORBEDRER ET EKSISTERENDE INDLÆG BASERET PÅ BRUGERENS FEEDBACK 🔴
+VIGTIGSTE REGEL: Brugerens feedback går forud for ALLE andre instruktioner.
+- Bevar kernbudskabet fra det originale indlæg
+- Tilpas FULDSTÆNDIGT efter brugerens feedback
+- Hvis brugeren ønsker kortere: ignorer minimum ordkrav
+- Hvis brugeren ønsker anderledes tone: juster tonen
+- Hvis brugeren ønsker specifikt indhold: inkluder det
+` : `
 KRITISKE INSTRUKTIONER:
 - Opret SUBSTANTIELT indhold (minimum 200 ord) - aldrig korte, generiske indlæg
 - Hvert indlæg skal være UNIKT og FORSKELLIGT fra andre
+`}
 - Brug autentisk, personlig stemme - undgå corporate jargon og marketing-snak
 - Inkluder specifikke eksempler, historier, casestudier eller detaljerede indsigter
 - Gør indlæg til at føles som om de kommer fra en med reel ekspertise og erfaring
@@ -140,7 +153,7 @@ Før du leverer det endelige output, skal du gennemgå dit genererede udkast i h
 Først efter at have bekræftet, at udkastet består alle fem tjek, skal du præsentere det endelige, polerede LinkedIn-indlæg.`;
   }
 
-  buildPostPrompt(entity, strategy, postType, postNumber = 1, requirements = '') {
+  buildPostPrompt(entity, strategy, postType, postNumber = 1, requirements = '', adaptiveContext = '') {
     const entityType = strategy ? strategy.entity_type : (entity.entity_type || 'person');
     const entityName = entity.name;
     const language = entity.language || 'da';
@@ -168,13 +181,40 @@ Først efter at have bekræftet, at udkastet består alle fem tjek, skal du præ
     // Build quality control section
     const qualityControl = this.buildQualityControl();
 
+    // Detect if this is improving an existing post
+    const isImprovingExisting = requirements.includes('EKSISTERENDE UDKAST');
+
     // Add user requirements if provided
     const userRequirements = requirements ? `
-### BRUGERENS SPECIFIKKE KRAV ###
+### 🔴 BRUGERENS SPECIFIKKE KRAV - ABSOLUT HØJESTE PRIORITET 🔴 ###
 Brugeren har angivet følgende krav til indlægget:
 "${requirements}"
 
-Dette skal prioriteres højest og integreres naturligt i indlægget. Sørg for at indholdet opfylder disse specifikke ønsker, samtidig med at det bevarer autenticiteten og kvaliteten i indlægget.
+${isImprovingExisting ? `
+⚠️ KRITISK: Du forbedrer et EKSISTERENDE indlæg baseret på brugerens feedback.
+
+REGLER FOR FORBEDRING:
+1. BEVAR kernbudskabet, hovedpointer og værdifulde indsigter fra det originale indlæg
+2. FØLG brugerens feedback PRÆCIST - den tilsidesætter ALLE standardinstruktioner nedenfor
+3. Brugerens feedback går forud for:
+   - Ordtælling (minimum 200 ord kan ignoreres hvis brugeren ønsker kortere)
+   - Tone og stil (tilpas efter brugerens ønske)
+   - Struktur (omstrukturer hvis brugeren beder om det)
+   - Alle andre regler og rammer
+
+EKSEMPLER PÅ FEEDBACK DU SKAL FØLGE FULDT UD:
+- "Gør indlægget kortere" → REDUCER ordmængde ved at kondensere budskabet (50-150 ord OK)
+- "Mere personlig tone" → TILFØJ personlige anekdoter, "jeg/vi"-perspektiv, følelser
+- "Referér til vores virksomhed" → INKLUDER virksomhedsspecifikke detaljer og referencer
+- "Tilføj fakta" → TILFØJ konkrete tal, statistikker, data
+- "Gør det mere professionelt" → JUSTER tone til mere formel stil
+- "Fokusér på X emne" → OMSTRUKTURÉR indlægget til at handle primært om X
+
+Dit job er at BEVARE essensen af det originale indlæg, men tilpasse det FULDSTÆNDIGT efter brugerens feedback.
+` : `
+⚠️ VIGTIGT: Disse krav skal integreres naturligt i indlægget og opfylder brugerens specifikke ønsker.
+Hvis brugerens krav konflikter med standardinstruktioner nedenfor, FØLG ALTID brugerens krav.
+`}
 ` : '';
 
     return `
@@ -182,14 +222,16 @@ ${worldviewContext}
 
 ${postTypeInstructions}
 
+${adaptiveContext ? `### ADAPTIV KONTEKST FRA SYSTEMETS HUKOMMELSE ###\n${adaptiveContext}\n` : ''}
+
 ${userRequirements}
 
 ### NEGATIVE BEGRÆNSNINGER ###
 ${negativeConstraints}
 
-### KRITISKE KRAV ###
+### STANDARD KRAV (kan tilsidesættes af brugerens feedback) ###
 - Skriv hele indlægget på ${targetLanguage}
-- Opret SUBSTANTIELT indhold (minimum 200 ord) - undgå korte, generiske indlæg
+- Opret substantielt indhold (typisk minimum 200 ord) - medmindre brugeren ønsker kortere
 - Gør hvert indlæg UNIKT og FORSKELLIGT fra andre
 - Inkluder specifikke eksempler, historier eller detaljerede indsigter
 - Brug autentisk, personlig stemme - undgå corporate jargon
@@ -207,8 +249,56 @@ VIGTIGT: Formatér svaret som gyldigt JSON kun. Inkluder ikke tekst før eller e
   "hashtags": []
 }
 
-Husk: Skab indhold der leverer ægte værdi og føles autentisk. Undgå generiske, korte indlæg. Gør det detaljeret og engagerende som en thought leader ville skrive. Returnér KUN JSON-objektet, ingen yderligere tekst.
+${isImprovingExisting ? 
+`🔴 HUSK: Du forbedrer et eksisterende indlæg baseret på brugerens feedback. 
+BEVAR kernbudskabet og essensen, men TILPAS FULDSTÆNDIGT efter brugerens specifikke ønsker.
+Brugerens feedback går forud for ALLE standardregler ovenfor.` 
+: 
+'Husk: Skab indhold der leverer ægte værdi og føles autentisk. Gør det detaljeret og engagerende som en thought leader ville skrive.'
+} Returnér KUN JSON-objektet, ingen yderligere tekst.
 `;
+  }
+
+  // Build adaptive memory context from feedbacks and published posts
+  async buildAdaptiveContext(entityType, entityId, limit = 10) {
+    try {
+      const parts = [];
+
+      // Recent approved/published posts
+      const { data: published, error: pubErr } = await supabase
+        .from('posts')
+        .select('content, hashtags, posted_date')
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .eq('status', 'posted')
+        .order('posted_date', { ascending: false })
+        .limit(limit);
+      if (!pubErr && published && published.length > 0) {
+        parts.push(`TIDLIGERE GODKENDTE/UDGIVNE INDLÆG (seneste ${published.length}):`);
+        published.forEach((p, idx) => {
+          parts.push(`- [${idx + 1}] ${p.content.substring(0, 600)}${p.content.length > 600 ? '...' : ''}`);
+        });
+      }
+
+      // Feedback memory
+      const { data: feedbacks, error: fbErr } = await supabase
+        .from('post_feedback')
+        .select('feedback, created_at')
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (!fbErr && feedbacks && feedbacks.length > 0) {
+        parts.push(`BRUGERENS FEEDBACK (seneste ${feedbacks.length}):`);
+        feedbacks.forEach((f, idx) => parts.push(`- [${idx + 1}] ${f.feedback}`));
+        parts.push('ANVEND FEEDBACKEN SOM STILGUIDE OG PRÆFERENCEKOMPAS.');
+      }
+
+      return parts.join('\n');
+    } catch (e) {
+      logger.warn('Failed building adaptive context', e);
+      return '';
+    }
   }
 
   parsePostResponse(postContent, language = 'da') {
